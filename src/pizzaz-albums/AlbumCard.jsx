@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
 import { Image } from "@openai/apps-sdk-ui/components/Image";
+import { Badge } from "@openai/apps-sdk-ui/components/Badge";
 
 function AlbumCard({ album, onSelect }) {
   return (
@@ -20,6 +21,15 @@ function AlbumCard({ album, onSelect }) {
             className="h-full w-full object-cover"
             loading="lazy"
           />
+          <Badge
+            variant="soft"
+            color="secondary"
+            size="sm"
+            pill
+            className="absolute left-3 top-3 bg-white/50 backdrop-blur-sm"
+          >
+            Featured
+          </Badge>
         </div>
         <div className="px-1.5">
           <div className="text-base font-medium truncate">{album.title}</div>

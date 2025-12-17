@@ -3,9 +3,6 @@
 @source "../node_modules/@openai/apps-sdk-ui";
 @source ".";
 
-@import "tailwindcss/preflight";
-@import "tailwindcss/utilities";
-
 @layer utilities {
   .overflow-auto > *,
   .overflow-scroll > *,
