@@ -1,9 +1,9 @@
 /**
- * Kitchen Sink Lite MCP server (Node).
+ * EliteMindset MCP server (Node) — based on kitchen_sink_server_node.
  *
  * Serves the kitchen-sink-lite widget HTML and exposes two tools:
- * - kitchen-sink-show: renders the widget with structured content, adding a processedAt/echoed demo.
- * - kitchen-sink-refresh: lightweight echo tool called from the widget via callTool.
+ * - next_best_step: returns the widget + one concrete next step (time-boxed).
+ * - kitchen-sink-refresh: lightweight echo tool called from the widget via callTool (left as-is).
  *
  * Uses @modelcontextprotocol/sdk over SSE transport. Make sure assets are built
  * (pnpm run build) so the widget HTML is available in /assets before starting.
@@ -47,6 +47,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..", "..");
 const ASSETS_DIR = path.resolve(ROOT_DIR, "assets");
 
+// Keep the same widget template to avoid any asset renaming right now.
 const TEMPLATE_URI = "ui://widget/kitchen-sink-lite.html";
 const MIME_TYPE = "text/html+skybridge";
 
@@ -88,8 +89,8 @@ function readWidgetHtml(): string {
 function toolDescriptorMeta() {
   return {
     "openai/outputTemplate": TEMPLATE_URI,
-    "openai/toolInvocation/invoking": "Preparing the kitchen sink widget",
-    "openai/toolInvocation/invoked": "Widget rendered",
+    "openai/toolInvocation/invoking": "Preparing EliteMindset",
+    "openai/toolInvocation/invoked": "Next step delivered",
     "openai/widgetAccessible": true,
   } as const;
 }
@@ -103,23 +104,29 @@ function toolInvocationMeta(invocation: string) {
 
 const widgetHtml = readWidgetHtml();
 
-const toolInputSchema = {
+/**
+ * EliteMindset: next_best_step input schema
+ */
+const nextBestStepInputSchema = {
   type: "object",
   properties: {
-    message: {
+    situation: {
       type: "string",
-      description: "Message to render in the widget.",
+      description:
+        "What’s going on right now. Include context and what you’re trying to move forward.",
     },
-    accentColor: {
+    constraints: {
       type: "string",
-      description: "Optional accent color (hex).",
+      description:
+        "Rules to follow (e.g., one step only, time limit, low friction, avoid X).",
     },
-    details: {
+    desired_outcome: {
       type: "string",
-      description: "Optional supporting copy to show under the headline.",
+      description:
+        "What you want by the end of the step (e.g., momentum, clarity, progress).",
     },
   },
-  required: ["message"],
+  required: ["situation"],
   additionalProperties: false,
 } as const;
 
@@ -132,10 +139,10 @@ const refreshInputSchema = {
   additionalProperties: false,
 } as const;
 
-const showParser = z.object({
-  message: z.string(),
-  accentColor: z.string().optional(),
-  details: z.string().optional(),
+const nextBestStepParser = z.object({
+  situation: z.string().min(1),
+  constraints: z.string().optional(),
+  desired_outcome: z.string().optional(),
 });
 
 const refreshParser = z.object({
@@ -144,10 +151,11 @@ const refreshParser = z.object({
 
 const tools: Tool[] = [
   {
-    name: "kitchen-sink-show",
-    title: "Render kitchen sink widget",
-    description: "Returns the widget template with the provided message.",
-    inputSchema: toolInputSchema,
+    name: "next_best_step",
+    title: "Next Best Step",
+    description:
+      "Returns exactly one concrete, time-boxed next step based on the situation and constraints.",
+    inputSchema: nextBestStepInputSchema,
     _meta: toolDescriptorMeta(),
     annotations: {
       destructiveHint: false,
@@ -189,10 +197,10 @@ const resourceTemplates: ResourceTemplate[] = [
   },
 ];
 
-function createKitchenSinkServer(): Server {
+function createEliteMindsetServer(): Server {
   const server = new Server(
     {
-      name: "kitchen-sink-node",
+      name: "elite-mindset-node",
       version: "0.1.0",
     },
     {
@@ -241,31 +249,60 @@ function createKitchenSinkServer(): Server {
   server.setRequestHandler(
     CallToolRequestSchema,
     async (request: CallToolRequest) => {
-      if (request.params.name === "kitchen-sink-show") {
-        const args = showParser.parse(request.params.arguments ?? {});
-        const processedAt = new Date().toISOString();
-        const echoed = args.message.toUpperCase();
+      if (request.params.name === "next_best_step") {
+        const args = nextBestStepParser.parse(request.params.arguments ?? {});
+
+        const constraints =
+          (args.constraints ?? "").trim() ||
+          "One step only. Make it concrete, time-boxed, and low-friction.";
+        const desired = (args.desired_outcome ?? "").trim();
+
+        // Try to detect a timebox mentioned in the situation; fall back to 30 minutes.
+        const timeboxMatch = args.situation.match(
+          /(\d+)\s*(minutes?|mins?|hours?|hrs?)/i
+        );
+        const timebox = timeboxMatch ? timeboxMatch[0] : "30 minutes";
+
+        // The output format is intentionally rigid: ONE step, not a list of options.
+        const step = `Set a ${timebox} timer and produce ONE shippable draft that moves distribution forward (not polish). Pick exactly one: (a) 5 App Store headline variants, (b) one outreach DM, or (c) a 20–30s UGC script. Write the ugly first draft without editing.`;
+
+        const finishLine =
+          "Done = you can paste/share the draft somewhere immediately (even if it’s not perfect).";
+
+        const detailsLines = [
+          `Next Best Step (${timebox}):`,
+          step,
+          "",
+          `Constraints: ${constraints}`,
+          desired ? `Desired outcome: ${desired}` : null,
+          "",
+          finishLine,
+        ].filter(Boolean);
+
+        const details = detailsLines.join("\n");
+
         const payload: WidgetPayload = {
-          message: args.message,
-          accentColor: args.accentColor ?? "#2d6cdf",
-          details:
-            args.details ??
-            `Processed at ${processedAt}. Echo (uppercased): ${echoed}.`,
-          fromTool: "kitchen-sink-show",
+          message: "Next Best Step (one action)",
+          accentColor: "#2d6cdf",
+          details,
+          fromTool: "next_best_step",
         };
-        // Demonstrate a tool transforming input before returning structured content.
+
         return {
-          content: [
-            {
-              type: "text",
-              text: `Widget ready with message: ${payload.message} (processed ${processedAt})`,
+          content: [{ type: "text", text: details }],
+          structuredContent: {
+            ...payload,
+            inputs: {
+              situation: args.situation,
+              constraints: args.constraints ?? "",
+              desired_outcome: args.desired_outcome ?? "",
             },
-          ],
-          structuredContent: { ...payload, processedAt, echoed },
-          _meta: toolInvocationMeta("kitchen-sink-show"),
+          },
+          _meta: toolInvocationMeta("next_best_step"),
         };
       }
 
+      // Leave the kitchen sink refresh tool unchanged for now.
       if (request.params.name === "kitchen-sink-refresh") {
         const args = refreshParser.parse(request.params.arguments ?? {});
         const payload: WidgetPayload = {
@@ -300,7 +337,7 @@ const postPath = "/mcp/messages";
 
 async function handleSseRequest(res: ServerResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  const server = createKitchenSinkServer();
+  const server = createEliteMindsetServer();
   const transport = new SSEServerTransport(postPath, res);
   const sessionId = transport.sessionId;
 
@@ -402,7 +439,7 @@ httpServer.on("clientError", (err: Error, socket) => {
 });
 
 httpServer.listen(port, () => {
-  console.log(`Kitchen Sink MCP server listening on http://localhost:${port}`);
+  console.log(`EliteMindset MCP server listening on http://localhost:${port}`);
   console.log(`  SSE stream: GET http://localhost:${port}${ssePath}`);
   console.log(
     `  Message post endpoint: POST http://localhost:${port}${postPath}?sessionId=...`
