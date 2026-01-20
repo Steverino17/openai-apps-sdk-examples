@@ -1,6 +1,6 @@
 /**
  * EliteMindset MCP Server for ChatGPT Apps
- * Based on OpenAI Apps SDK pattern from kitchen_sink_server_node
+ * Provides micro-action clarity coaching
  */
 import {
   createServer,
@@ -20,15 +20,15 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-// Tool metadata for OpenAI
+// Tool metadata
 function toolMeta() {
   return {
     "openai/toolInvocation/invoking": "Analyzing your situation...",
     "openai/toolInvocation/invoked": "Next step identified",
-  } as const;
+  };
 }
 
-// Input schema
+// Input schema - NO 'as const' to avoid TypeScript errors
 const nextBestStepInputSchema = {
   type: "object",
   properties: {
@@ -39,7 +39,7 @@ const nextBestStepInputSchema = {
   },
   required: ["user_input"],
   additionalProperties: false,
-} as const;
+};
 
 const inputParser = z.object({
   user_input: z.string().min(1),
@@ -264,7 +264,7 @@ const httpServer = createServer(
 
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
 
-    // Handle CORS preflight
+    // CORS preflight
     if (
       req.method === "OPTIONS" &&
       (url.pathname === ssePath || url.pathname === postPath)
@@ -290,6 +290,7 @@ const httpServer = createServer(
       res.end(JSON.stringify({
         name: "EliteMindset MCP Server",
         version: "1.0.0",
+        tool: "next_best_step",
         endpoints: {
           sse: ssePath,
           post: postPath,
@@ -327,5 +328,6 @@ httpServer.listen(port, "0.0.0.0", () => {
   console.log(`✓ SSE endpoint: GET ${ssePath}`);
   console.log(`✓ POST endpoint: POST ${postPath}?sessionId=...`);
   console.log(`✓ Health: GET /healthz`);
+  console.log(`✓ Tool: next_best_step`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 });
