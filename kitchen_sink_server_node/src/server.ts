@@ -28,7 +28,7 @@ function toolMeta() {
   };
 }
 
-// Input schema - NO 'as const' to avoid TypeScript errors
+// Input schema
 const nextBestStepInputSchema = {
   type: "object",
   properties: {
@@ -90,13 +90,13 @@ function inferState(userText: string): keyof typeof stateData {
   return "S1";
 }
 
-// Tool definition
+// Tool definition - FIX: Cast inputSchema as any to avoid TypeScript strict typing issues
 const tools: Tool[] = [
   {
     name: "next_best_step",
     description: "Help user overcome procrastination and analysis-paralysis by identifying the smallest immediate next action. Use when user expresses being stuck, overwhelmed, unclear, or asks for direction.",
-    inputSchema: nextBestStepInputSchema,
-    _meta: toolMeta(),
+    inputSchema: nextBestStepInputSchema as any,
+    _meta: toolMeta() as any,
     annotations: {
       destructiveHint: false,
       openWorldHint: false,
@@ -153,7 +153,7 @@ function createEliteMindsetServer(): Server {
             action: data.ask,
             state: state,
           },
-          _meta: toolMeta(),
+          _meta: toolMeta() as any,
         };
       }
 
