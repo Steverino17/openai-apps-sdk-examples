@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "description": "EliteMindset MCP Server for ChatGPT Apps",
-  "main": "dist/elitemindset-server.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/elitemindset-server.js",
-    "dev": "tsc && node dist/elitemindset-server.js"
+    "start": "node dist/server.js",
+    "dev": "tsc && node dist/server.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
